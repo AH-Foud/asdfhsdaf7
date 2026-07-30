@@ -240,3 +240,60 @@ async def health():
 
 
 # ===================== BOT POLLING =====================
+
+def bot_polling_loop():
+    import time as time_mod, requests as req
+    B = '\033[38;2;91;154;255m'
+    G = '\033[38;2;14;203;129m'
+    Y = '\033[38;2;240;165;0m'
+    R = '\033[38;2;246;70;93m'
+    D = '\033[38;2;148;163;184m'
+    RST = '\033[0m'
+    print(f"{G}  > {RST} Bot polling started {D}(admin: {config.ADMIN_ID}){RST}")
+    offset = 0
+    while True:
+        try:
+            url = f"{config.BASE_URL}/getUpdates"
+            resp = req.get(url, params={"offset": offset, "timeout": 30}, timeout=35)
+            if resp.status_code != 200:
+                time_mod.sleep(3)
+                continue
+            result = resp.json()
+            if not result.get("ok"):
+                continue
+            updates = result.get("result", [])
+            for update in updates:
+                try:
+                    bot_core.process_update(update)
+                except Exception as e:
+                    print(f"{R}[Bot] Update error: {e}{RST}")
+                offset = update["update_id"] + 1
+            if updates:
+                print(f"{D}[{time.strftime('%H:%M:%S')}]{RST} {Y}{len(updates)}{RST} new message(s)")
+        except req.exceptions.Timeout:
+            pass
+        except req.exceptions.ConnectionError:
+            print(f"{R}  Connection error, retrying...{RST}")
+            time_mod.sleep(5)
+        except Exception as e:
+            print(f"{R}[Bot] Error: {e}{RST}")
+            time_mod.sleep(3)
+
+
+def run():
+    B = '\033[38;2;91;154;255m'
+    P = '\033[38;2;167;139;250m'
+    G = '\033[38;2;14;203;129m'
+    W = '\033[38;2;255;255;255m'
+    D = '\033[38;2;148;163;184m'
+    RST = '\033[0m'
+    bot_core.init()
+    bot_thread = threading.Thread(target=bot_polling_loop, daemon=True)
+    bot_thread.start()
+    print(f"\n{G}  > {RST}  Dashboard {W}http://{config.WEB_HOST}:{config.WEB_PORT}{RST}")
+    print(f"{D}     Bot running in background{RST}\n")
+    uvicorn.run(app, host=config.WEB_HOST, port=config.WEB_PORT, log_level="warning")
+
+
+if __name__ == "__main__":
+    run()
